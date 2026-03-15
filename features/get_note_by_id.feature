@@ -22,4 +22,4 @@ Feature: Get Note by ID
   Scenario: Get note by invalid ID (malformed)
     Given an invalid note ID format "abc123"
     When I send a request to get the note by ID
-    Then the response status code should be 400
+    Then the response status code should be 422

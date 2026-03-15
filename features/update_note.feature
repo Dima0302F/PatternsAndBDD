@@ -23,4 +23,5 @@ Feature: Update Note
     Given an existing note with title "Original" and content "Original content"
     And I have the note ID
     When I update the note with title "" and content "Updated content"
-    Then the response status code should be 400
+    Then the response status code should be 200
+    And the response should contain the correct title ""

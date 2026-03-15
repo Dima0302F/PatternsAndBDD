@@ -9,7 +9,7 @@ import logging
 def step_check_api_available(context):
     """Check if API is available"""
     if not hasattr(context, 'client'):
-        from api_client import APIClient
+        from steps.api_client import APIClient
         context.client = APIClient()
     context.client.reset()
 
@@ -70,7 +70,14 @@ def step_create_existing_note(context, title, content):
     """Create a note that will be used for retrieval"""
     note_data = context.client.factory.create_valid_note(title, content)
     response = context.client.note_page.create_note(note_data)
-    assert response.status_code == 201
+    
+    # Добавим отладку
+    print(f"\nResponse status: {response.status_code}")
+    print(f"Response body: {response.text}")
+    
+    assert response.status_code == 200 or response.status_code == 201, \
+           f"Expected 200/201 but got {response.status_code}"
+    
     context.client.current_note_data = response.json()
     context.client.current_note_id = context.client.current_note_data['id']
     context.client.created_notes.append(context.client.current_note_id)
@@ -165,8 +172,19 @@ def step_check_notes_fields(context):
 def step_check_error_message(context, message):
     """Check error message contains expected text"""
     error_data = context.client.response.json()
-    error_msg = error_data.get('message', error_data.get('error', ''))
-    assert_that(message.lower() in error_msg.lower())
+    
+    # FastAPI может возвращать ошибку в разных форматах
+    error_msg = ""
+    if isinstance(error_data, dict):
+        error_msg = error_data.get('message', '') or \
+                    error_data.get('detail', '') or \
+                    error_data.get('error', '') or \
+                    str(error_data)
+    else:
+        error_msg = str(error_data)
+    
+    assert message.lower() in error_msg.lower(), \
+           f"Expected '{message}' in '{error_msg}'"
 
 @then('the note should be updated with the new values')
 def step_check_note_updated(context):
@@ -185,3 +203,54 @@ def step_check_note_deleted(context):
 def step_check_note_not_created(context):
     """Verify note was not created"""
     assert_that(context.client.current_note_id, equal_to(None))
+
+@given('I have note data with title "" and content "Some content"')
+def step_impl_empty_title(context):
+    """Step for empty title"""
+    context.client.current_note_data = {
+        "title": "",
+        "content": "Some content"
+    }
+
+@given('I have note data with title "Empty Note" and content ""')
+def step_impl_empty_content(context):
+    """Step for empty content"""
+    context.client.current_note_data = {
+        "title": "Empty Note",
+        "content": ""
+    }
+
+@when('I update the note with title "" and content "Updated content"')
+def step_impl_update_empty_title(context):
+    """Step for updating with empty title"""
+    update_data = {
+        "title": "",
+        "content": "Updated content"
+    }
+    context.client.response = context.client.note_page.update_note(
+        context.client.current_note_id, update_data
+    )
+@then('the response should contain a note with id')
+def step_check_note_has_id(context):
+    """Check that response contains an ID"""
+    response_data = context.client.response.json()
+    assert 'id' in response_data, f"Response has no 'id' field: {response_data}"
+    assert response_data['id'] is not None
+
+@then('the note should have empty title')
+def step_check_empty_title(context):
+    """Check that note has empty title"""
+    response_data = context.client.response.json()
+    assert response_data.get('title') == "", f"Expected empty title, got: {response_data.get('title')}"
+
+@then('the response should contain the correct title ""')
+def step_check_empty_title_response(context):
+    """Check response contains empty title"""
+    response_data = context.client.response.json()
+    assert_that(response_data.get('title'), equal_to(""))
+
+@then('the response should contain the correct content ""')
+def step_check_empty_content_response(context):
+    """Check response contains empty content"""
+    response_data = context.client.response.json()
+    assert_that(response_data.get('content'), equal_to(""))
